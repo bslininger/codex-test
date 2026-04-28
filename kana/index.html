@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kana Flashcards</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="study-panel" aria-labelledby="app-title">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">Japanese kana trainer</p>
+            <h1 id="app-title">Kana Flashcards</h1>
+          </div>
+          <div class="topbar-actions">
+            <label class="theme-picker" for="theme-select">
+              Theme
+              <select id="theme-select">
+                <option value="paper">Paper and Ink</option>
+                <option value="laser">Laser Show</option>
+              </select>
+            </label>
+            <div class="scoreboard" aria-label="Session score">
+              <span><strong id="correct-count">0</strong> correct</span>
+              <span><strong id="seen-count">0</strong> seen</span>
+              <span><strong id="streak-count">0</strong> streak</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls" aria-label="Study settings">
+          <fieldset>
+            <legend>Script</legend>
+            <label><input type="checkbox" id="hiragana-toggle" checked /> Hiragana</label>
+            <label><input type="checkbox" id="katakana-toggle" checked /> Katakana</label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Sets</legend>
+            <label><input type="checkbox" id="basic-toggle" checked /> Basic</label>
+            <label><input type="checkbox" id="dakuten-toggle" /> Dakuten</label>
+            <label><input type="checkbox" id="combo-toggle" /> Combos</label>
+          </fieldset>
+
+          <button id="shuffle-button" type="button">Shuffle</button>
+          <button id="reset-button" type="button">Reset</button>
+        </div>
+
+        <section class="card-area" aria-live="polite">
+          <div class="card-meta">
+            <span id="script-label">Hiragana</span>
+            <span id="set-label">Basic</span>
+          </div>
+
+          <button id="flashcard" class="flashcard" type="button" aria-label="Reveal answer">
+            <span id="kana-symbol" class="kana-symbol">あ</span>
+            <span id="answer-text" class="answer-text" hidden>a</span>
+          </button>
+
+          <form id="answer-form" class="answer-form">
+            <label for="answer-input">Type the romaji</label>
+            <div class="answer-row">
+              <input
+                id="answer-input"
+                name="answer"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="e.g. ka"
+              />
+              <button type="submit">Check</button>
+            </div>
+          </form>
+
+          <p id="feedback" class="feedback" role="status">Press the card to reveal, or type an answer.</p>
+
+          <div class="actions">
+            <button id="know-button" type="button">I knew it</button>
+            <button id="miss-button" type="button">Missed it</button>
+            <button id="next-button" type="button">Next card</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>
