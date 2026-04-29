@@ -1,0 +1,14 @@
+{
+    "name": "inventory",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc",
+        "typecheck": "tsc --noEmit",
+        "demo": "tsc && node dist/demo.js",
+        "preview": "vite preview"
+    },
+    "devDependencies": {
+        "typescript": "^6.0.3",
+        "vite": "^8.0.10"
+    }
+}
