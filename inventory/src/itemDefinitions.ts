@@ -1,4 +1,4 @@
-import type { ItemDefinition } from "./inventory.js";
+import type { ItemDefinition } from "./inventoryModel.js";
 
 export const ITEM_DEFINITIONS: Record<string, ItemDefinition> = {
     "health-potion": {

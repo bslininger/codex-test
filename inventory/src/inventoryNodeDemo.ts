@@ -1,5 +1,5 @@
-import { addItem, createInventory } from "./inventory.js";
-import { ITEM_DEFINITIONS } from "./items.js";
+import { addItem, createInventory } from "./inventoryModel.js";
+import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
 const inventory = createInventory(3);
 

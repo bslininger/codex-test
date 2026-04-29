@@ -4,7 +4,7 @@
         "dev": "vite",
         "build": "tsc",
         "typecheck": "tsc --noEmit",
-        "demo": "tsc && node dist/demo.js",
+        "demo": "tsc && node dist/inventoryNodeDemo.js",
         "preview": "vite preview"
     },
     "devDependencies": {
