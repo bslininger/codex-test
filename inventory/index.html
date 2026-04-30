@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Inventory</title>
+        <script type="module" src="/src/inventoryPage.ts"></script>
+    </head>
+    <body>
+        <main class="inventory-page">
+            <section class="inventory-shell" aria-labelledby="inventory-title">
+                <header class="page-header">
+                    <div>
+                        <p class="eyebrow">System Design Practice</p>
+                        <h1 id="inventory-title">Inventory</h1>
+                    </div>
+                    <button id="reset-button" class="secondary-button" type="button">Reset</button>
+                </header>
+
+                <div id="slot-grid" class="slot-grid" aria-label="Inventory slots"></div>
+
+                <section class="control-panel" aria-label="Add items">
+                    <button class="item-button" type="button" data-item-id="health-potion" data-quantity="8">
+                        Add 8 Potions
+                    </button>
+                    <button class="item-button" type="button" data-item-id="apple" data-quantity="12">
+                        Add 12 Apples
+                    </button>
+                    <button class="item-button" type="button" data-item-id="sword" data-quantity="1">
+                        Add Sword
+                    </button>
+                </section>
+
+                <output id="result-output" class="result-output" aria-live="polite"></output>
+            </section>
+        </main>
+    </body>
+</html>

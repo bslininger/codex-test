@@ -2,9 +2,9 @@
     "name": "inventory",
     "scripts": {
         "dev": "vite",
-        "build": "tsc",
+        "build": "tsc --noEmit && vite build",
         "typecheck": "tsc --noEmit",
-        "demo": "tsc && node dist/inventoryNodeDemo.js",
+        "demo": "tsc && node dist-node/inventoryNodeDemo.js",
         "preview": "vite preview"
     },
     "devDependencies": {
