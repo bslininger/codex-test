@@ -74,6 +74,16 @@ h1 {
     box-shadow: 0 0 0 3px rgb(15 118 110 / 18%);
 }
 
+.slot.is-selected {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgb(124 58 237 / 20%);
+}
+
+.slot:focus-visible {
+    outline: 3px solid #1f6f8b;
+    outline-offset: 3px;
+}
+
 .slot-index {
     color: #718096;
     font-size: 0.78rem;

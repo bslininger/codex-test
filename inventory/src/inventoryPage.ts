@@ -1,11 +1,19 @@
 import "./styles.css";
 
-import { addItem, createInventory, type AddItemResult, type Inventory } from "./inventoryModel.js";
+import {
+    addItem,
+    createInventory,
+    moveSlot,
+    type AddItemResult,
+    type Inventory,
+    type MoveSlotResult,
+} from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
 const slotCount = 8;
 const inventory = createInventory(slotCount);
 let lastChangedSlotIndices: number[] = [];
+let selectedSlotIndex: number | null = null;
 
 const elements = {
     slotGrid: getElement<HTMLDivElement>("#slot-grid"),
@@ -34,6 +42,14 @@ function renderInventory(inventoryToRender: Inventory): void {
                 slotElement.classList.add("is-changed");
             }
 
+            if (selectedSlotIndex === index) {
+                slotElement.classList.add("is-selected");
+            }
+
+            slotElement.tabIndex = 0;
+            slotElement.setAttribute("role", "button");
+            slotElement.setAttribute("aria-label", `Slot ${index + 1}`);
+
             const indexElement = document.createElement("div");
             indexElement.className = "slot-index";
             indexElement.textContent = `Slot ${index + 1}`;
@@ -55,6 +71,14 @@ function renderInventory(inventoryToRender: Inventory): void {
             }
 
             slotElement.append(indexElement, nameElement, metaElement);
+            slotElement.addEventListener("click", () => handleSlotClick(index));
+            slotElement.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleSlotClick(index);
+                }
+            });
+
             return slotElement;
         }),
     );
@@ -68,6 +92,26 @@ function renderResult(result: AddItemResult): void {
     ].join(" | ");
 }
 
+function renderMoveResult(result: MoveSlotResult): void {
+    if (result.kind === "no-op") {
+        elements.resultOutput.value = `Move: ${formatNoOpReason(result.reason)}`;
+        return;
+    }
+
+    if (result.kind === "merged") {
+        elements.resultOutput.value = [
+            `Move: merged ${result.movedQuantity}`,
+            `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
+        ].join(" | ");
+        return;
+    }
+
+    elements.resultOutput.value = [
+        `Move: ${result.kind}`,
+        `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
+    ].join(" | ");
+}
+
 function formatChangedSlots(changedSlotIndices: number[]): string {
     if (changedSlotIndices.length === 0) {
         return "none";
@@ -76,9 +120,39 @@ function formatChangedSlots(changedSlotIndices: number[]): string {
     return changedSlotIndices.map((index) => String(index + 1)).join(", ");
 }
 
+function formatNoOpReason(reason: Extract<MoveSlotResult, { kind: "no-op" }>["reason"]): string {
+    if (reason === "same-slot") {
+        return "same slot";
+    }
+
+    if (reason === "empty-source") {
+        return "empty source slot";
+    }
+
+    return "target stack is full";
+}
+
+function handleSlotClick(index: number): void {
+    if (selectedSlotIndex === null) {
+        selectedSlotIndex = index;
+        lastChangedSlotIndices = [];
+        elements.resultOutput.value = `Selected slot ${index + 1}`;
+        renderInventory(inventory);
+        return;
+    }
+
+    const result = moveSlot(inventory, ITEM_DEFINITIONS, selectedSlotIndex, index);
+
+    selectedSlotIndex = null;
+    lastChangedSlotIndices = result.changedSlotIndices;
+    renderInventory(inventory);
+    renderMoveResult(result);
+}
+
 function resetInventory(): void {
     inventory.slots.fill(null);
     lastChangedSlotIndices = [];
+    selectedSlotIndex = null;
     elements.resultOutput.value = "";
     renderInventory(inventory);
 }
@@ -94,6 +168,7 @@ elements.itemButtons.forEach((button) => {
 
         const result = addItem(inventory, ITEM_DEFINITIONS, itemId, quantity);
 
+        selectedSlotIndex = null;
         lastChangedSlotIndices = result.changedSlotIndices;
         renderInventory(inventory);
         renderResult(result);

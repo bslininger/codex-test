@@ -21,6 +21,26 @@ export type AddItemResult = {
     changedSlotIndices: number[];
 };
 
+export type MoveSlotResult =
+    | {
+          kind: "no-op";
+          reason: "same-slot" | "empty-source" | "target-stack-full";
+          changedSlotIndices: [];
+      }
+    | {
+          kind: "moved";
+          changedSlotIndices: number[];
+      }
+    | {
+          kind: "merged";
+          movedQuantity: number;
+          changedSlotIndices: number[];
+      }
+    | {
+          kind: "swapped";
+          changedSlotIndices: number[];
+      };
+
 export function createInventory(slotCount: number): Inventory {
     return {
         slots: Array.from({ length: slotCount }, () => null),
@@ -90,6 +110,86 @@ export function addItem(
     return buildAddItemResult(quantity, remainingQuantity, changedSlotIndices);
 }
 
+export function moveSlot(
+    inventory: Inventory,
+    itemDefinitions: Record<string, ItemDefinition>,
+    fromIndex: number,
+    toIndex: number,
+): MoveSlotResult {
+    validateSlotIndex(inventory, fromIndex);
+    validateSlotIndex(inventory, toIndex);
+
+    if (fromIndex === toIndex) {
+        return {
+            kind: "no-op",
+            reason: "same-slot",
+            changedSlotIndices: [],
+        };
+    }
+
+    const fromSlot = inventory.slots[fromIndex];
+    const toSlot = inventory.slots[toIndex];
+
+    if (!fromSlot) {
+        return {
+            kind: "no-op",
+            reason: "empty-source",
+            changedSlotIndices: [],
+        };
+    }
+
+    if (!toSlot) {
+        inventory.slots[toIndex] = fromSlot;
+        inventory.slots[fromIndex] = null;
+
+        return {
+            kind: "moved",
+            changedSlotIndices: [fromIndex, toIndex],
+        };
+    }
+
+    if (fromSlot.itemId === toSlot.itemId) {
+        const itemDefinition = itemDefinitions[fromSlot.itemId];
+
+        if (!itemDefinition) {
+            throw new Error(`Unknown item id: ${fromSlot.itemId}`);
+        }
+
+        const availableSpace = itemDefinition.maxStackSize - toSlot.quantity;
+
+        if (availableSpace <= 0) {
+            return {
+                kind: "no-op",
+                reason: "target-stack-full",
+                changedSlotIndices: [],
+            };
+        }
+
+        const movedQuantity = Math.min(availableSpace, fromSlot.quantity);
+
+        toSlot.quantity += movedQuantity;
+        fromSlot.quantity -= movedQuantity;
+
+        if (fromSlot.quantity === 0) {
+            inventory.slots[fromIndex] = null;
+        }
+
+        return {
+            kind: "merged",
+            movedQuantity,
+            changedSlotIndices: [fromIndex, toIndex],
+        };
+    }
+
+    inventory.slots[fromIndex] = toSlot;
+    inventory.slots[toIndex] = fromSlot;
+
+    return {
+        kind: "swapped",
+        changedSlotIndices: [fromIndex, toIndex],
+    };
+}
+
 function buildAddItemResult(
     requestedQuantity: number,
     remainingQuantity: number,
@@ -100,4 +200,10 @@ function buildAddItemResult(
         leftoverQuantity: remainingQuantity,
         changedSlotIndices: Array.from(changedSlotIndices),
     };
+}
+
+function validateSlotIndex(inventory: Inventory, index: number): void {
+    if (!Number.isInteger(index) || index < 0 || index >= inventory.slots.length) {
+        throw new Error(`Slot index out of range: ${index}`);
+    }
 }
