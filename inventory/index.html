@@ -37,6 +37,21 @@
 
                 <output id="result-output" class="result-output" aria-live="polite"></output>
             </section>
+
+            <dialog id="quantity-dialog" class="quantity-dialog">
+                <form id="quantity-form" method="dialog">
+                    <h2 id="quantity-title">Take Quantity</h2>
+                    <input id="quantity-slider" class="quantity-slider" type="range" min="1" value="1" />
+                    <label class="quantity-field">
+                        Amount
+                        <input id="quantity-input" type="number" min="1" value="1" />
+                    </label>
+                    <div class="dialog-actions">
+                        <button class="secondary-button" type="button" id="quantity-cancel-button">Cancel</button>
+                        <button class="item-button" type="submit">Take</button>
+                    </div>
+                </form>
+            </dialog>
         </main>
     </body>
 </html>

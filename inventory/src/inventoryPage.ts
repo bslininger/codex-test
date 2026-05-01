@@ -5,10 +5,12 @@ import {
     createHeldSlot,
     createInventory,
     interactHeldSlotWithInventorySlot,
+    pullQuantityFromInventorySlotToHeldSlot,
     type AddItemResult,
     type HeldSlot,
     type HeldSlotInteractionResult,
     type Inventory,
+    type PullQuantityResult,
 } from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
@@ -16,12 +18,18 @@ const slotCount = 8;
 const inventory = createInventory(slotCount);
 const heldSlot = createHeldSlot();
 let lastChangedSlotIndices: number[] = [];
+let quantityDialogSourceIndex: number | null = null;
 
 const elements = {
     heldSlot: getElement<HTMLDivElement>("#held-slot"),
     slotGrid: getElement<HTMLDivElement>("#slot-grid"),
     resetButton: getElement<HTMLButtonElement>("#reset-button"),
     resultOutput: getElement<HTMLOutputElement>("#result-output"),
+    quantityDialog: getElement<HTMLDialogElement>("#quantity-dialog"),
+    quantityForm: getElement<HTMLFormElement>("#quantity-form"),
+    quantitySlider: getElement<HTMLInputElement>("#quantity-slider"),
+    quantityInput: getElement<HTMLInputElement>("#quantity-input"),
+    quantityCancelButton: getElement<HTMLButtonElement>("#quantity-cancel-button"),
     itemButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-item-id]")),
 };
 
@@ -70,11 +78,11 @@ function renderInventory(inventoryToRender: Inventory): void {
             }
 
             slotElement.append(indexElement, nameElement, metaElement);
-            slotElement.addEventListener("click", () => handleSlotClick(index));
+            slotElement.addEventListener("click", (event) => handleSlotClick(event, index));
             slotElement.addEventListener("keydown", (event) => {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    handleSlotClick(index);
+                    handleSlotClick(event, index);
                 }
             });
 
@@ -114,6 +122,14 @@ function renderResult(result: AddItemResult): void {
     elements.resultOutput.value = [
         `Added: ${result.addedQuantity}`,
         `Left over: ${result.leftoverQuantity}`,
+        `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
+    ].join(" | ");
+}
+
+function renderPullQuantityResult(result: PullQuantityResult): void {
+    elements.resultOutput.value = [
+        `Pulled: ${result.quantity}`,
+        result.fullStack ? "Full stack" : "Partial stack",
         `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
     ].join(" | ");
 }
@@ -164,7 +180,19 @@ function formatInteractionKind(kind: Exclude<HeldSlotInteractionResult["kind"], 
     return kind;
 }
 
-function handleSlotClick(index: number): void {
+function handleSlotClick(event: MouseEvent | KeyboardEvent, index: number): void {
+    const slot = inventory.slots[index];
+
+    if (!heldSlot.entry && slot && slot.quantity > 1 && event.ctrlKey) {
+        pullQuantity(index, 1);
+        return;
+    }
+
+    if (!heldSlot.entry && slot && slot.quantity > 1 && event.shiftKey) {
+        openQuantityDialog(index);
+        return;
+    }
+
     const result = interactHeldSlotWithInventorySlot(heldSlot, inventory, ITEM_DEFINITIONS, index);
 
     lastChangedSlotIndices = result.changedSlotIndices;
@@ -173,10 +201,53 @@ function handleSlotClick(index: number): void {
     renderHeldSlotInteractionResult(result);
 }
 
+function pullQuantity(sourceIndex: number, quantity: number): void {
+    const result = pullQuantityFromInventorySlotToHeldSlot(heldSlot, inventory, sourceIndex, quantity);
+
+    lastChangedSlotIndices = result.changedSlotIndices;
+    renderInventory(inventory);
+    renderHeldSlot(heldSlot);
+    renderPullQuantityResult(result);
+}
+
+function openQuantityDialog(sourceIndex: number): void {
+    const slot = inventory.slots[sourceIndex];
+
+    if (!slot) {
+        throw new Error(`Cannot open quantity dialog for empty slot: ${sourceIndex}`);
+    }
+
+    quantityDialogSourceIndex = sourceIndex;
+
+    elements.quantitySlider.max = String(slot.quantity);
+    elements.quantityInput.max = String(slot.quantity);
+    elements.quantitySlider.value = "1";
+    elements.quantityInput.value = "1";
+    elements.quantityDialog.showModal();
+    elements.quantityInput.focus();
+}
+
+function closeQuantityDialog(): void {
+    quantityDialogSourceIndex = null;
+    elements.quantityDialog.close();
+}
+
+function syncQuantityControls(source: HTMLInputElement, target: HTMLInputElement): void {
+    const min = Number(source.min);
+    const max = Number(source.max);
+    const fallbackValue = Number(source.value || source.min);
+    const clampedValue = Math.min(Math.max(fallbackValue, min), max);
+    const nextValue = String(clampedValue);
+
+    source.value = nextValue;
+    target.value = nextValue;
+}
+
 function resetInventory(): void {
     inventory.slots.fill(null);
     heldSlot.entry = null;
     lastChangedSlotIndices = [];
+    closeQuantityDialog();
     elements.resultOutput.value = "";
     renderInventory(inventory);
     renderHeldSlot(heldSlot);
@@ -198,6 +269,30 @@ elements.itemButtons.forEach((button) => {
         renderHeldSlot(heldSlot);
         renderResult(result);
     });
+});
+
+elements.quantitySlider.addEventListener("input", () => {
+    syncQuantityControls(elements.quantitySlider, elements.quantityInput);
+});
+
+elements.quantityInput.addEventListener("input", () => {
+    syncQuantityControls(elements.quantityInput, elements.quantitySlider);
+});
+
+elements.quantityCancelButton.addEventListener("click", closeQuantityDialog);
+
+elements.quantityForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (quantityDialogSourceIndex === null) {
+        throw new Error("Quantity dialog submitted without a source slot.");
+    }
+
+    const quantity = Number(elements.quantityInput.value);
+    const sourceIndex = quantityDialogSourceIndex;
+
+    closeQuantityDialog();
+    pullQuantity(sourceIndex, quantity);
 });
 
 elements.resetButton.addEventListener("click", resetInventory);

@@ -185,6 +185,55 @@ h1 {
     font-weight: 700;
 }
 
+.quantity-dialog {
+    width: min(360px, calc(100% - 32px));
+    border: 1px solid #b7c3d0;
+    border-radius: 8px;
+    color: #1f2933;
+    background: #f8faf9;
+    box-shadow: 0 24px 60px rgb(31 41 51 / 24%);
+}
+
+.quantity-dialog::backdrop {
+    background: rgb(31 41 51 / 35%);
+}
+
+.quantity-dialog form {
+    display: grid;
+    gap: 14px;
+}
+
+.quantity-dialog h2 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.quantity-slider {
+    width: 100%;
+}
+
+.quantity-field {
+    display: grid;
+    gap: 6px;
+    color: #52616f;
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.quantity-field input {
+    min-height: 40px;
+    padding: 0 10px;
+    border: 1px solid #b7c3d0;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: end;
+    gap: 10px;
+}
+
 @media (max-width: 640px) {
     .inventory-page {
         padding: 20px;
@@ -202,5 +251,9 @@ h1 {
     .item-button,
     .secondary-button {
         width: 100%;
+    }
+
+    .dialog-actions {
+        flex-direction: column;
     }
 }

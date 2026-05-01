@@ -69,6 +69,13 @@ export type HeldSlotInteractionResult =
           changedSlotIndices: number[];
       };
 
+export type PullQuantityResult = {
+    kind: "pulled";
+    quantity: number;
+    fullStack: boolean;
+    changedSlotIndices: number[];
+};
+
 export function createInventory(slotCount: number): Inventory {
     return {
         slots: Array.from({ length: slotCount }, () => null),
@@ -306,6 +313,53 @@ export function interactHeldSlotWithInventorySlot(
     return {
         kind: "swapped",
         changedSlotIndices: [targetIndex],
+    };
+}
+
+export function pullQuantityFromInventorySlotToHeldSlot(
+    heldSlot: HeldSlot,
+    inventory: Inventory,
+    sourceIndex: number,
+    quantity: number,
+): PullQuantityResult {
+    validateSlotIndex(inventory, sourceIndex);
+
+    if (heldSlot.entry) {
+        throw new Error("Cannot pull quantity while held slot is occupied.");
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error("Quantity must be a positive integer.");
+    }
+
+    const sourceSlot = inventory.slots[sourceIndex];
+
+    if (!sourceSlot) {
+        throw new Error(`Cannot pull quantity from empty slot: ${sourceIndex}`);
+    }
+
+    if (quantity > sourceSlot.quantity) {
+        throw new Error(`Cannot pull ${quantity} from stack of ${sourceSlot.quantity}.`);
+    }
+
+    const fullStack = quantity === sourceSlot.quantity;
+
+    if (fullStack) {
+        heldSlot.entry = sourceSlot;
+        inventory.slots[sourceIndex] = null;
+    } else {
+        sourceSlot.quantity -= quantity;
+        heldSlot.entry = {
+            itemId: sourceSlot.itemId,
+            quantity,
+        };
+    }
+
+    return {
+        kind: "pulled",
+        quantity,
+        fullStack,
+        changedSlotIndices: [sourceIndex],
     };
 }
 

@@ -4,6 +4,7 @@ import {
     createInventory,
     interactHeldSlotWithInventorySlot,
     moveSlot,
+    pullQuantityFromInventorySlotToHeldSlot,
 } from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
@@ -37,4 +38,14 @@ console.log(heldMergeResult);
 console.log("Held slot:");
 console.log(heldSlot);
 console.log("Inventory after held interactions:");
+console.log(inventory.slots);
+
+heldSlot.entry = null;
+const pullResult = pullQuantityFromInventorySlotToHeldSlot(heldSlot, inventory, 2, 3);
+
+console.log("Pull quantity result:");
+console.log(pullResult);
+console.log("Held slot after pull:");
+console.log(heldSlot);
+console.log("Inventory after pull:");
 console.log(inventory.slots);
