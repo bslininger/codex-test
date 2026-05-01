@@ -2,28 +2,35 @@ import "./styles.css";
 
 import {
     addItem,
+    createMoney,
     createHeldSlot,
     createInventory,
     interactHeldSlotWithInventorySlot,
     pullQuantityFromInventorySlotToHeldSlot,
+    sellHeldItem,
     type AddItemResult,
     type HeldSlot,
     type HeldSlotInteractionResult,
     type Inventory,
+    type Money,
     type PullQuantityResult,
+    type SellHeldItemResult,
 } from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
 const slotCount = 8;
 const inventory = createInventory(slotCount);
 const heldSlot = createHeldSlot();
+const playerMoney = createMoney();
 let lastChangedSlotIndices: number[] = [];
 let quantityDialogSourceIndex: number | null = null;
 
 const elements = {
     heldSlot: getElement<HTMLDivElement>("#held-slot"),
+    moneyDisplay: getElement<HTMLDivElement>("#money-display"),
     slotGrid: getElement<HTMLDivElement>("#slot-grid"),
     resetButton: getElement<HTMLButtonElement>("#reset-button"),
+    sellHeldButton: getElement<HTMLButtonElement>("#sell-held-button"),
     resultOutput: getElement<HTMLOutputElement>("#result-output"),
     quantityDialog: getElement<HTMLDialogElement>("#quantity-dialog"),
     quantityForm: getElement<HTMLFormElement>("#quantity-form"),
@@ -57,6 +64,15 @@ function createItemSprite(itemId: string): HTMLImageElement {
         imageElement.src = "/sprites/placeholder.png";
         imageElement.classList.add("is-placeholder");
     });
+
+    return imageElement;
+}
+
+function createMoneySprite(denomination: keyof Money): HTMLImageElement {
+    const imageElement = document.createElement("img");
+    imageElement.className = "money-sprite";
+    imageElement.src = getSpritePath(`money-${denomination}`);
+    imageElement.alt = denomination;
 
     return imageElement;
 }
@@ -138,11 +154,50 @@ function renderHeldSlot(heldSlotToRender: HeldSlot): void {
     elements.heldSlot.append(labelElement, nameElement, metaElement);
 }
 
+function renderMoney(money: Money): void {
+    if (money.gold > 0) {
+        elements.moneyDisplay.replaceChildren(
+            createMoneyAmount("gold", money.gold),
+            createMoneyAmount("silver", money.silver),
+            createMoneyAmount("copper", money.copper),
+        );
+    }
+    else if (money.silver > 0) {
+         elements.moneyDisplay.replaceChildren(
+            createMoneyAmount("silver", money.silver),
+            createMoneyAmount("copper", money.copper),
+        );
+    }
+    else {
+        elements.moneyDisplay.replaceChildren(createMoneyAmount("copper", money.copper));
+    }
+}
+
+function createMoneyAmount(denomination: keyof Money, amount: number): HTMLSpanElement {
+    const amountElement = document.createElement("span");
+    amountElement.className = "money-amount";
+
+    const valueElement = document.createElement("span");
+    valueElement.textContent = String(amount);
+
+    amountElement.append(valueElement, createMoneySprite(denomination));
+    return amountElement;
+}
+
 function renderResult(result: AddItemResult): void {
     elements.resultOutput.value = [
         `Added: ${result.addedQuantity}`,
         `Left over: ${result.leftoverQuantity}`,
         `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
+    ].join(" | ");
+}
+
+function renderSellHeldItemResult(result: SellHeldItemResult): void {
+    const itemDefinition = ITEM_DEFINITIONS[result.itemId];
+
+    elements.resultOutput.value = [
+        `Sold: ${result.quantity} ${itemDefinition?.name ?? result.itemId}`,
+        `Value: ${result.valueCopper} copper`,
     ].join(" | ");
 }
 
@@ -266,11 +321,15 @@ function syncQuantityControls(source: HTMLInputElement, target: HTMLInputElement
 function resetInventory(): void {
     inventory.slots.fill(null);
     heldSlot.entry = null;
+    playerMoney.gold = 0;
+    playerMoney.silver = 0;
+    playerMoney.copper = 0;
     lastChangedSlotIndices = [];
     closeQuantityDialog();
     elements.resultOutput.value = "";
     renderInventory(inventory);
     renderHeldSlot(heldSlot);
+    renderMoney(playerMoney);
 }
 
 elements.itemButtons.forEach((button) => {
@@ -289,6 +348,19 @@ elements.itemButtons.forEach((button) => {
         renderHeldSlot(heldSlot);
         renderResult(result);
     });
+});
+
+elements.sellHeldButton.addEventListener("click", () => {
+    if (!heldSlot.entry) {
+        elements.resultOutput.value = "Sell: hold an item first";
+        return;
+    }
+
+    const result = sellHeldItem(heldSlot, ITEM_DEFINITIONS, playerMoney);
+
+    renderHeldSlot(heldSlot);
+    renderMoney(playerMoney);
+    renderSellHeldItemResult(result);
 });
 
 elements.quantitySlider.addEventListener("input", () => {
@@ -319,3 +391,4 @@ elements.resetButton.addEventListener("click", resetInventory);
 
 renderInventory(inventory);
 renderHeldSlot(heldSlot);
+renderMoney(playerMoney);

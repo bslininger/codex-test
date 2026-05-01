@@ -2,9 +2,11 @@ import {
     addItem,
     createHeldSlot,
     createInventory,
+    createMoney,
     interactHeldSlotWithInventorySlot,
     moveSlot,
     pullQuantityFromInventorySlotToHeldSlot,
+    sellHeldItem,
 } from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
@@ -49,3 +51,11 @@ console.log("Held slot after pull:");
 console.log(heldSlot);
 console.log("Inventory after pull:");
 console.log(inventory.slots);
+
+const money = createMoney();
+const sellResult = sellHeldItem(heldSlot, ITEM_DEFINITIONS, money);
+
+console.log("Sell result:");
+console.log(sellResult);
+console.log("Money after sale:");
+console.log(money);

@@ -2,6 +2,7 @@ export type ItemDefinition = {
     id: string;
     name: string;
     maxStackSize: number;
+    valueCopper: number;
 };
 
 export type InventoryEntry = {
@@ -17,6 +18,12 @@ export type Inventory = {
 
 export type HeldSlot = {
     entry: InventorySlot;
+};
+
+export type Money = {
+    gold: number;
+    silver: number;
+    copper: number;
 };
 
 export type AddItemResult = {
@@ -76,6 +83,14 @@ export type PullQuantityResult = {
     changedSlotIndices: number[];
 };
 
+export type SellHeldItemResult = {
+    kind: "sold";
+    itemId: string;
+    quantity: number;
+    valueCopper: number;
+    moneyAdded: Money;
+};
+
 export function createInventory(slotCount: number): Inventory {
     return {
         slots: Array.from({ length: slotCount }, () => null),
@@ -85,6 +100,18 @@ export function createInventory(slotCount: number): Inventory {
 export function createHeldSlot(): HeldSlot {
     return {
         entry: null,
+    };
+}
+
+export function createMoney(gold = 0, silver = 0, copper = 0): Money {
+    validateMoneyAmount(gold, "gold");
+    validateMoneyAmount(silver, "silver");
+    validateMoneyAmount(copper, "copper");
+
+    return {
+        gold,
+        silver,
+        copper,
     };
 }
 
@@ -363,6 +390,61 @@ export function pullQuantityFromInventorySlotToHeldSlot(
     };
 }
 
+export function convertCopperToLowestTerms(valueCopper: number): Money {
+    validateMoneyAmount(valueCopper, "valueCopper");
+
+    const gold = Math.floor(valueCopper / 10_000);
+    const remainingAfterGold = valueCopper % 10_000;
+    const silver = Math.floor(remainingAfterGold / 100);
+    const copper = remainingAfterGold % 100;
+
+    return {
+        gold,
+        silver,
+        copper,
+    };
+}
+
+export function addMoney(money: Money, moneyToAdd: Money): void {
+    validateMoney(moneyToAdd);
+
+    money.gold += moneyToAdd.gold;
+    money.silver += moneyToAdd.silver;
+    money.copper += moneyToAdd.copper;
+}
+
+export function sellHeldItem(
+    heldSlot: HeldSlot,
+    itemDefinitions: Record<string, ItemDefinition>,
+    money: Money,
+): SellHeldItemResult {
+    const heldEntry = heldSlot.entry;
+
+    if (!heldEntry) {
+        throw new Error("Cannot sell an empty held slot.");
+    }
+
+    const itemDefinition = itemDefinitions[heldEntry.itemId];
+
+    if (!itemDefinition) {
+        throw new Error(`Unknown item id: ${heldEntry.itemId}`);
+    }
+
+    const valueCopper = itemDefinition.valueCopper * heldEntry.quantity;
+    const moneyAdded = convertCopperToLowestTerms(valueCopper);
+
+    addMoney(money, moneyAdded);
+    heldSlot.entry = null;
+
+    return {
+        kind: "sold",
+        itemId: heldEntry.itemId,
+        quantity: heldEntry.quantity,
+        valueCopper,
+        moneyAdded,
+    };
+}
+
 function buildAddItemResult(
     requestedQuantity: number,
     remainingQuantity: number,
@@ -378,5 +460,17 @@ function buildAddItemResult(
 function validateSlotIndex(inventory: Inventory, index: number): void {
     if (!Number.isInteger(index) || index < 0 || index >= inventory.slots.length) {
         throw new Error(`Slot index out of range: ${index}`);
+    }
+}
+
+function validateMoney(money: Money): void {
+    validateMoneyAmount(money.gold, "gold");
+    validateMoneyAmount(money.silver, "silver");
+    validateMoneyAmount(money.copper, "copper");
+}
+
+function validateMoneyAmount(amount: number, label: string): void {
+    if (!Number.isInteger(amount) || amount < 0) {
+        throw new Error(`${label} must be a non-negative integer.`);
     }
 }
