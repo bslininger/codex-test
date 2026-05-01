@@ -66,7 +66,7 @@ h1 {
 
 .held-slot {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 48px 1fr auto;
     gap: 12px;
     align-items: center;
     min-height: 58px;
@@ -102,10 +102,12 @@ h1 {
 }
 
 .slot {
+    position: relative;
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    min-height: 132px;
-    padding: 12px;
+    place-items: center;
+    aspect-ratio: 1;
+    min-height: 0;
+    padding: 8px;
 }
 
 .slot.is-changed {
@@ -118,26 +120,39 @@ h1 {
     outline-offset: 3px;
 }
 
-.slot-index {
-    color: #718096;
-    font-size: 0.78rem;
-    font-weight: 700;
+.item-sprite {
+    display: block;
+    object-fit: contain;
 }
 
-.slot-name {
-    align-self: center;
-    color: #1f2933;
+.slot .item-sprite {
+    width: 80%;
+    height: 80%;
+}
+
+.held-slot .item-sprite {
+    width: min(72px, 80%);
+    height: min(72px, 80%);
+}
+
+.item-sprite.is-placeholder {
+    filter: blur(2px) grayscale(1) opacity(0.7);
+}
+
+.slot-quantity {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    min-width: 24px;
+    padding: 2px 6px;
+    border: 1px solid rgb(31 41 51 / 20%);
+    border-radius: 4px;
+    color: #ffffff;
+    background: rgb(31 41 51 / 72%);
+    font-size: 0.82rem;
     font-weight: 800;
-}
-
-.slot-meta {
-    color: #52616f;
-    font-size: 0.9rem;
-}
-
-.slot.is-empty .slot-name,
-.slot.is-empty .slot-meta {
-    color: #8b98a8;
+    line-height: 1.1;
+    text-align: center;
 }
 
 .control-panel {

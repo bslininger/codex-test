@@ -43,6 +43,24 @@ function getElement<T extends HTMLElement>(selector: string): T {
     return element;
 }
 
+function getSpritePath(itemId: string): string {
+    return `/sprites/${itemId}.png`;
+}
+
+function createItemSprite(itemId: string): HTMLImageElement {
+    const imageElement = document.createElement("img");
+    imageElement.className = "item-sprite";
+    imageElement.src = getSpritePath(itemId);
+    imageElement.alt = "";
+
+    imageElement.addEventListener("error", () => {
+        imageElement.src = "/sprites/placeholder.png";
+        imageElement.classList.add("is-placeholder");
+    });
+
+    return imageElement;
+}
+
 function renderInventory(inventoryToRender: Inventory): void {
     elements.slotGrid.replaceChildren(
         ...inventoryToRender.slots.map((slot, index) => {
@@ -57,27 +75,26 @@ function renderInventory(inventoryToRender: Inventory): void {
             slotElement.setAttribute("role", "button");
             slotElement.setAttribute("aria-label", `Slot ${index + 1}`);
 
-            const indexElement = document.createElement("div");
-            indexElement.className = "slot-index";
-            indexElement.textContent = `Slot ${index + 1}`;
-
-            const nameElement = document.createElement("div");
-            nameElement.className = "slot-name";
-
-            const metaElement = document.createElement("div");
-            metaElement.className = "slot-meta";
-
             if (!slot) {
                 slotElement.classList.add("is-empty");
-                nameElement.textContent = "Empty";
-                metaElement.textContent = "";
             } else {
                 const itemDefinition = ITEM_DEFINITIONS[slot.itemId];
-                nameElement.textContent = itemDefinition?.name ?? slot.itemId;
-                metaElement.textContent = `${slot.quantity} / ${itemDefinition?.maxStackSize ?? "?"}`;
+                const imageElement = createItemSprite(slot.itemId);
+                slotElement.setAttribute(
+                    "aria-label",
+                    `Slot ${index + 1}: ${itemDefinition?.name ?? slot.itemId}, quantity ${slot.quantity}`,
+                );
+
+                slotElement.append(imageElement);
+
+                if (slot.quantity > 1) {
+                    const quantityElement = document.createElement("div");
+                    quantityElement.className = "slot-quantity";
+                    quantityElement.textContent = String(slot.quantity);
+                    slotElement.append(quantityElement);
+                }
             }
 
-            slotElement.append(indexElement, nameElement, metaElement);
             slotElement.addEventListener("click", (event) => handleSlotClick(event, index));
             slotElement.addEventListener("keydown", (event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -111,8 +128,11 @@ function renderHeldSlot(heldSlotToRender: HeldSlot): void {
         metaElement.textContent = "";
     } else {
         const itemDefinition = ITEM_DEFINITIONS[heldSlotToRender.entry.itemId];
+        const imageElement = createItemSprite(heldSlotToRender.entry.itemId);
+
         nameElement.textContent = itemDefinition?.name ?? heldSlotToRender.entry.itemId;
         metaElement.textContent = `Quantity: ${heldSlotToRender.entry.quantity}`;
+        elements.heldSlot.append(imageElement);
     }
 
     elements.heldSlot.append(labelElement, nameElement, metaElement);
