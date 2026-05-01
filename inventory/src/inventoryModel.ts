@@ -15,6 +15,10 @@ export type Inventory = {
     slots: InventorySlot[];
 };
 
+export type HeldSlot = {
+    entry: InventorySlot;
+};
+
 export type AddItemResult = {
     addedQuantity: number;
     leftoverQuantity: number;
@@ -41,9 +45,39 @@ export type MoveSlotResult =
           changedSlotIndices: number[];
       };
 
+export type HeldSlotInteractionResult =
+    | {
+          kind: "no-op";
+          reason: "empty-held-and-empty-target" | "target-stack-full";
+          changedSlotIndices: [];
+      }
+    | {
+          kind: "picked-up";
+          changedSlotIndices: number[];
+      }
+    | {
+          kind: "placed";
+          changedSlotIndices: number[];
+      }
+    | {
+          kind: "merged";
+          movedQuantity: number;
+          changedSlotIndices: number[];
+      }
+    | {
+          kind: "swapped";
+          changedSlotIndices: number[];
+      };
+
 export function createInventory(slotCount: number): Inventory {
     return {
         slots: Array.from({ length: slotCount }, () => null),
+    };
+}
+
+export function createHeldSlot(): HeldSlot {
+    return {
+        entry: null,
     };
 }
 
@@ -187,6 +221,91 @@ export function moveSlot(
     return {
         kind: "swapped",
         changedSlotIndices: [fromIndex, toIndex],
+    };
+}
+
+export function interactHeldSlotWithInventorySlot(
+    heldSlot: HeldSlot,
+    inventory: Inventory,
+    itemDefinitions: Record<string, ItemDefinition>,
+    targetIndex: number,
+): HeldSlotInteractionResult {
+    validateSlotIndex(inventory, targetIndex);
+
+    const heldEntry = heldSlot.entry;
+    const targetSlot = inventory.slots[targetIndex];
+
+    if (!heldEntry && !targetSlot) {
+        return {
+            kind: "no-op",
+            reason: "empty-held-and-empty-target",
+            changedSlotIndices: [],
+        };
+    }
+
+    if (!heldEntry && targetSlot) {
+        heldSlot.entry = targetSlot;
+        inventory.slots[targetIndex] = null;
+
+        return {
+            kind: "picked-up",
+            changedSlotIndices: [targetIndex],
+        };
+    }
+
+    if (heldEntry && !targetSlot) {
+        inventory.slots[targetIndex] = heldEntry;
+        heldSlot.entry = null;
+
+        return {
+            kind: "placed",
+            changedSlotIndices: [targetIndex],
+        };
+    }
+
+    if (!heldEntry || !targetSlot) {
+        throw new Error("Unexpected held slot interaction state.");
+    }
+
+    if (heldEntry.itemId === targetSlot.itemId) {
+        const itemDefinition = itemDefinitions[heldEntry.itemId];
+
+        if (!itemDefinition) {
+            throw new Error(`Unknown item id: ${heldEntry.itemId}`);
+        }
+
+        const availableSpace = itemDefinition.maxStackSize - targetSlot.quantity;
+
+        if (availableSpace <= 0) {
+            return {
+                kind: "no-op",
+                reason: "target-stack-full",
+                changedSlotIndices: [],
+            };
+        }
+
+        const movedQuantity = Math.min(availableSpace, heldEntry.quantity);
+
+        targetSlot.quantity += movedQuantity;
+        heldEntry.quantity -= movedQuantity;
+
+        if (heldEntry.quantity === 0) {
+            heldSlot.entry = null;
+        }
+
+        return {
+            kind: "merged",
+            movedQuantity,
+            changedSlotIndices: [targetIndex],
+        };
+    }
+
+    heldSlot.entry = targetSlot;
+    inventory.slots[targetIndex] = heldEntry;
+
+    return {
+        kind: "swapped",
+        changedSlotIndices: [targetIndex],
     };
 }
 

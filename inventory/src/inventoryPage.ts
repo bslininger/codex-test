@@ -2,20 +2,23 @@ import "./styles.css";
 
 import {
     addItem,
+    createHeldSlot,
     createInventory,
-    moveSlot,
+    interactHeldSlotWithInventorySlot,
     type AddItemResult,
+    type HeldSlot,
+    type HeldSlotInteractionResult,
     type Inventory,
-    type MoveSlotResult,
 } from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
 const slotCount = 8;
 const inventory = createInventory(slotCount);
+const heldSlot = createHeldSlot();
 let lastChangedSlotIndices: number[] = [];
-let selectedSlotIndex: number | null = null;
 
 const elements = {
+    heldSlot: getElement<HTMLDivElement>("#held-slot"),
     slotGrid: getElement<HTMLDivElement>("#slot-grid"),
     resetButton: getElement<HTMLButtonElement>("#reset-button"),
     resultOutput: getElement<HTMLOutputElement>("#result-output"),
@@ -40,10 +43,6 @@ function renderInventory(inventoryToRender: Inventory): void {
 
             if (lastChangedSlotIndices.includes(index)) {
                 slotElement.classList.add("is-changed");
-            }
-
-            if (selectedSlotIndex === index) {
-                slotElement.classList.add("is-selected");
             }
 
             slotElement.tabIndex = 0;
@@ -84,6 +83,33 @@ function renderInventory(inventoryToRender: Inventory): void {
     );
 }
 
+function renderHeldSlot(heldSlotToRender: HeldSlot): void {
+    elements.heldSlot.replaceChildren();
+    elements.heldSlot.className = "held-slot";
+
+    const labelElement = document.createElement("div");
+    labelElement.className = "held-label";
+    labelElement.textContent = "Held";
+
+    const nameElement = document.createElement("div");
+    nameElement.className = "held-name";
+
+    const metaElement = document.createElement("div");
+    metaElement.className = "held-meta";
+
+    if (!heldSlotToRender.entry) {
+        elements.heldSlot.classList.add("is-empty");
+        nameElement.textContent = "Empty";
+        metaElement.textContent = "";
+    } else {
+        const itemDefinition = ITEM_DEFINITIONS[heldSlotToRender.entry.itemId];
+        nameElement.textContent = itemDefinition?.name ?? heldSlotToRender.entry.itemId;
+        metaElement.textContent = `Quantity: ${heldSlotToRender.entry.quantity}`;
+    }
+
+    elements.heldSlot.append(labelElement, nameElement, metaElement);
+}
+
 function renderResult(result: AddItemResult): void {
     elements.resultOutput.value = [
         `Added: ${result.addedQuantity}`,
@@ -92,9 +118,9 @@ function renderResult(result: AddItemResult): void {
     ].join(" | ");
 }
 
-function renderMoveResult(result: MoveSlotResult): void {
+function renderHeldSlotInteractionResult(result: HeldSlotInteractionResult): void {
     if (result.kind === "no-op") {
-        elements.resultOutput.value = `Move: ${formatNoOpReason(result.reason)}`;
+        elements.resultOutput.value = `Held slot: ${formatHeldSlotNoOpReason(result.reason)}`;
         return;
     }
 
@@ -107,7 +133,7 @@ function renderMoveResult(result: MoveSlotResult): void {
     }
 
     elements.resultOutput.value = [
-        `Move: ${result.kind}`,
+        `Held slot: ${formatInteractionKind(result.kind)}`,
         `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
     ].join(" | ");
 }
@@ -120,41 +146,40 @@ function formatChangedSlots(changedSlotIndices: number[]): string {
     return changedSlotIndices.map((index) => String(index + 1)).join(", ");
 }
 
-function formatNoOpReason(reason: Extract<MoveSlotResult, { kind: "no-op" }>["reason"]): string {
-    if (reason === "same-slot") {
-        return "same slot";
-    }
-
-    if (reason === "empty-source") {
-        return "empty source slot";
+function formatHeldSlotNoOpReason(
+    reason: Extract<HeldSlotInteractionResult, { kind: "no-op" }>["reason"],
+): string {
+    if (reason === "empty-held-and-empty-target") {
+        return "nothing to pick up or place";
     }
 
     return "target stack is full";
 }
 
-function handleSlotClick(index: number): void {
-    if (selectedSlotIndex === null) {
-        selectedSlotIndex = index;
-        lastChangedSlotIndices = [];
-        elements.resultOutput.value = `Selected slot ${index + 1}`;
-        renderInventory(inventory);
-        return;
+function formatInteractionKind(kind: Exclude<HeldSlotInteractionResult["kind"], "merged" | "no-op">): string {
+    if (kind === "picked-up") {
+        return "picked up";
     }
 
-    const result = moveSlot(inventory, ITEM_DEFINITIONS, selectedSlotIndex, index);
+    return kind;
+}
 
-    selectedSlotIndex = null;
+function handleSlotClick(index: number): void {
+    const result = interactHeldSlotWithInventorySlot(heldSlot, inventory, ITEM_DEFINITIONS, index);
+
     lastChangedSlotIndices = result.changedSlotIndices;
     renderInventory(inventory);
-    renderMoveResult(result);
+    renderHeldSlot(heldSlot);
+    renderHeldSlotInteractionResult(result);
 }
 
 function resetInventory(): void {
     inventory.slots.fill(null);
+    heldSlot.entry = null;
     lastChangedSlotIndices = [];
-    selectedSlotIndex = null;
     elements.resultOutput.value = "";
     renderInventory(inventory);
+    renderHeldSlot(heldSlot);
 }
 
 elements.itemButtons.forEach((button) => {
@@ -168,9 +193,9 @@ elements.itemButtons.forEach((button) => {
 
         const result = addItem(inventory, ITEM_DEFINITIONS, itemId, quantity);
 
-        selectedSlotIndex = null;
         lastChangedSlotIndices = result.changedSlotIndices;
         renderInventory(inventory);
+        renderHeldSlot(heldSlot);
         renderResult(result);
     });
 });
@@ -178,3 +203,4 @@ elements.itemButtons.forEach((button) => {
 elements.resetButton.addEventListener("click", resetInventory);
 
 renderInventory(inventory);
+renderHeldSlot(heldSlot);
