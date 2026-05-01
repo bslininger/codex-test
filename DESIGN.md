@@ -165,3 +165,66 @@ AI can make execution cheaper, but understanding still matters. In many cases it
 If this work resumes in a future Codex session or on another computer, start here. The project is intentionally a system design practice exercise centered on a small inventory web app, informed by Brian's earlier Unity inventory system.
 
 Do not immediately rush into implementation. Start by restoring the learning context, then continue with a small design decision and an understanding check.
+
+## Current Project State
+
+The active project is in `inventory/`. The older `kana/` folder is unrelated.
+
+Current structure:
+
+- `inventory/src/inventoryModel.ts` owns core inventory rules and types.
+- `inventory/src/itemDefinitions.ts` owns sample item definitions.
+- `inventory/src/inventoryPage.ts` owns the browser page behavior and also contains some controller-like logic.
+- `inventory/src/itemTooltip.ts` creates item tooltip elements.
+- `inventory/src/viewHelpers.ts` owns shared view helpers such as sprite paths, item sprite elements, and money display elements.
+- `inventory/src/inventoryNodeDemo.ts` is a Node demo for exercising model behavior outside the browser.
+- `inventory/public/sprites/` contains item and money sprites. Item sprite filenames intentionally match item ids.
+
+Run commands from `inventory/`:
+
+- `npm.cmd run dev`
+- `npm.cmd run typecheck`
+- `npm.cmd run demo`
+- `npm.cmd run build`
+
+The app currently supports:
+
+- Item definitions with `id`, `name`, `maxStackSize`, and `valueCopper`.
+- Inventory entries as `itemId` plus `quantity`.
+- Inventory slots as `InventoryEntry | null`.
+- Adding items with merge-first behavior and overflow reporting.
+- Direct slot movement via `moveSlot`, kept in the model even though the current page mostly uses held-slot interaction.
+- A separate `HeldSlot`, intentionally outside `Inventory`.
+- Held-slot interaction: pick up, place, merge, swap, and no-op cases.
+- Ctrl+click to pull one item from a stack into the empty held slot.
+- Shift+click to open a quantity chooser and pull a selected amount into the empty held slot.
+- Sprite display in slots, with a placeholder fallback for missing item sprites.
+- A money system where item values are stored as copper integers, while player money is stored as non-normalized `{ gold, silver, copper }`.
+- Selling the held item stack for lowest-terms money added to the player money object.
+- Hover tooltips for occupied inventory slots only.
+
+Important design decisions made so far:
+
+- The inventory model owns rules and state transitions, not presentation.
+- UI/controller code decides how clicks, Ctrl, Shift, dialogs, hover, and rendering map to model calls.
+- Held slot is its own slot-like container, not part of `Inventory`.
+- Item sprites are an implicit view convention: `/sprites/${itemId}.png`.
+- Money sprites are view assets, not item definitions.
+- Item value is stored as `valueCopper`; player money is stored as denominations and is not automatically normalized.
+- Tooltip positioning is pure UI behavior and belongs outside the model.
+
+Brian's current collaboration preference:
+
+- Ask one design question at a time.
+- Use light hints unless Brian asks for more.
+- Let Brian sketch model/result types and rules before Codex suggests final shapes.
+- Brian may prefer to implement model changes himself and have Codex review.
+- Codex can more freely help with view/CSS/DOM work, which is useful but not the main learning target.
+- Continue naming responsibilities and boundaries explicitly, but avoid over-explaining obvious points.
+
+Useful next directions:
+
+- Review and refine tooltip styling/positioning.
+- Consider whether `inventoryPage.ts` is starting to mix too much view and controller logic.
+- Add purchase/spend-money behavior later, where copper is spent before silver/gold according to the chosen non-normalized money design.
+- Add equipment slots, container inventories, or item instance state such as durability/charges when the current model starts needing them.
