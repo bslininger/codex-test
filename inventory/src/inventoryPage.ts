@@ -16,7 +16,9 @@ import {
     type PullQuantityResult,
     type SellHeldItemResult,
 } from "./inventoryModel.js";
+import { createItemTooltip } from "./itemTooltip.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
+import { createItemSprite, createMoneyAmountDisplayElements } from "./viewHelpers.js";
 
 const slotCount = 8;
 const inventory = createInventory(slotCount);
@@ -24,6 +26,7 @@ const heldSlot = createHeldSlot();
 const playerMoney = createMoney();
 let lastChangedSlotIndices: number[] = [];
 let quantityDialogSourceIndex: number | null = null;
+let activeTooltip: HTMLElement | null = null;
 
 const elements = {
     heldSlot: getElement<HTMLDivElement>("#held-slot"),
@@ -50,34 +53,9 @@ function getElement<T extends HTMLElement>(selector: string): T {
     return element;
 }
 
-function getSpritePath(itemId: string): string {
-    return `/sprites/${itemId}.png`;
-}
-
-function createItemSprite(itemId: string): HTMLImageElement {
-    const imageElement = document.createElement("img");
-    imageElement.className = "item-sprite";
-    imageElement.src = getSpritePath(itemId);
-    imageElement.alt = "";
-
-    imageElement.addEventListener("error", () => {
-        imageElement.src = "/sprites/placeholder.png";
-        imageElement.classList.add("is-placeholder");
-    });
-
-    return imageElement;
-}
-
-function createMoneySprite(denomination: keyof Money): HTMLImageElement {
-    const imageElement = document.createElement("img");
-    imageElement.className = "money-sprite";
-    imageElement.src = getSpritePath(`money-${denomination}`);
-    imageElement.alt = denomination;
-
-    return imageElement;
-}
-
 function renderInventory(inventoryToRender: Inventory): void {
+    removeActiveTooltip();
+
     elements.slotGrid.replaceChildren(
         ...inventoryToRender.slots.map((slot, index) => {
             const slotElement = document.createElement("div");
@@ -109,6 +87,12 @@ function renderInventory(inventoryToRender: Inventory): void {
                     quantityElement.textContent = String(slot.quantity);
                     slotElement.append(quantityElement);
                 }
+
+                slotElement.addEventListener("mouseenter", (event) => {
+                    showItemTooltip(itemDefinition, slot.quantity, event);
+                });
+                slotElement.addEventListener("mousemove", moveActiveTooltip);
+                slotElement.addEventListener("mouseleave", removeActiveTooltip);
             }
 
             slotElement.addEventListener("click", (event) => handleSlotClick(event, index));
@@ -155,33 +139,7 @@ function renderHeldSlot(heldSlotToRender: HeldSlot): void {
 }
 
 function renderMoney(money: Money): void {
-    if (money.gold > 0) {
-        elements.moneyDisplay.replaceChildren(
-            createMoneyAmount("gold", money.gold),
-            createMoneyAmount("silver", money.silver),
-            createMoneyAmount("copper", money.copper),
-        );
-    }
-    else if (money.silver > 0) {
-         elements.moneyDisplay.replaceChildren(
-            createMoneyAmount("silver", money.silver),
-            createMoneyAmount("copper", money.copper),
-        );
-    }
-    else {
-        elements.moneyDisplay.replaceChildren(createMoneyAmount("copper", money.copper));
-    }
-}
-
-function createMoneyAmount(denomination: keyof Money, amount: number): HTMLSpanElement {
-    const amountElement = document.createElement("span");
-    amountElement.className = "money-amount";
-
-    const valueElement = document.createElement("span");
-    valueElement.textContent = String(amount);
-
-    amountElement.append(valueElement, createMoneySprite(denomination));
-    return amountElement;
+    elements.moneyDisplay.replaceChildren(...createMoneyAmountDisplayElements(money));
 }
 
 function renderResult(result: AddItemResult): void {
@@ -253,6 +211,45 @@ function formatInteractionKind(kind: Exclude<HeldSlotInteractionResult["kind"], 
     }
 
     return kind;
+}
+
+function showItemTooltip(item: (typeof ITEM_DEFINITIONS)[string], quantity: number, event: MouseEvent): void {
+    removeActiveTooltip();
+    activeTooltip = createItemTooltip(item, quantity);
+    document.body.append(activeTooltip);
+    moveActiveTooltip(event);
+}
+
+function moveActiveTooltip(event: MouseEvent): void {
+    if (!activeTooltip) {
+        return;
+    }
+
+    const cursorOffset = 10;
+    const pageMargin = 8;
+    const tooltipRect = activeTooltip.getBoundingClientRect();
+    let left = event.clientX - tooltipRect.width - cursorOffset;
+    let top = event.clientY - tooltipRect.height - cursorOffset;
+
+    if (left < pageMargin) {
+        left = event.clientX + cursorOffset;
+    }
+
+    if (top < pageMargin) {
+        top = pageMargin;
+    }
+
+    if (left + tooltipRect.width > window.innerWidth - pageMargin) {
+        left = window.innerWidth - tooltipRect.width - pageMargin;
+    }
+
+    activeTooltip.style.left = `${left}px`;
+    activeTooltip.style.top = `${top}px`;
+}
+
+function removeActiveTooltip(): void {
+    activeTooltip?.remove();
+    activeTooltip = null;
 }
 
 function handleSlotClick(event: MouseEvent | KeyboardEvent, index: number): void {
