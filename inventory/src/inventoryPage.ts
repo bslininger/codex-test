@@ -27,9 +27,10 @@ const playerMoney = createMoney();
 let lastChangedSlotIndices: number[] = [];
 let quantityDialogSourceIndex: number | null = null;
 let activeTooltip: HTMLElement | null = null;
+let heldItemFollower: HTMLElement | null = null;
+let lastPointerPosition: { clientX: number; clientY: number } | null = null;
 
 const elements = {
-    heldSlot: getElement<HTMLDivElement>("#held-slot"),
     moneyDisplay: getElement<HTMLDivElement>("#money-display"),
     slotGrid: getElement<HTMLDivElement>("#slot-grid"),
     resetButton: getElement<HTMLButtonElement>("#reset-button"),
@@ -109,33 +110,39 @@ function renderInventory(inventoryToRender: Inventory): void {
 }
 
 function renderHeldSlot(heldSlotToRender: HeldSlot): void {
-    elements.heldSlot.replaceChildren();
-    elements.heldSlot.className = "held-slot";
+    renderHeldItemFollower(heldSlotToRender);
+}
 
-    const labelElement = document.createElement("div");
-    labelElement.className = "held-label";
-    labelElement.textContent = "Held";
-
-    const nameElement = document.createElement("div");
-    nameElement.className = "held-name";
-
-    const metaElement = document.createElement("div");
-    metaElement.className = "held-meta";
+function renderHeldItemFollower(heldSlotToRender: HeldSlot): void {
+    heldItemFollower?.remove();
+    heldItemFollower = null;
 
     if (!heldSlotToRender.entry) {
-        elements.heldSlot.classList.add("is-empty");
-        nameElement.textContent = "Empty";
-        metaElement.textContent = "";
-    } else {
-        const itemDefinition = ITEM_DEFINITIONS[heldSlotToRender.entry.itemId];
-        const imageElement = createItemSprite(heldSlotToRender.entry.itemId);
-
-        nameElement.textContent = itemDefinition?.name ?? heldSlotToRender.entry.itemId;
-        metaElement.textContent = `Quantity: ${heldSlotToRender.entry.quantity}`;
-        elements.heldSlot.append(imageElement);
+        return;
     }
 
-    elements.heldSlot.append(labelElement, nameElement, metaElement);
+    heldItemFollower = createHeldItemFollowerElement(heldSlotToRender.entry);
+    document.body.append(heldItemFollower);
+
+    if (lastPointerPosition) {
+        moveHeldItemFollower(lastPointerPosition);
+    }
+}
+
+function createHeldItemFollowerElement(entry: NonNullable<HeldSlot["entry"]>): HTMLElement {
+    const followerElement = document.createElement("div");
+    followerElement.className = "held-item-follower";
+    followerElement.setAttribute("aria-hidden", "true");
+    followerElement.append(createItemSprite(entry.itemId));
+
+    if (entry.quantity > 1) {
+        const quantityElement = document.createElement("div");
+        quantityElement.className = "slot-quantity";
+        quantityElement.textContent = String(entry.quantity);
+        followerElement.append(quantityElement);
+    }
+
+    return followerElement;
 }
 
 function renderMoney(money: Money): void {
@@ -245,6 +252,16 @@ function moveActiveTooltip(event: MouseEvent): void {
 
     activeTooltip.style.left = `${left}px`;
     activeTooltip.style.top = `${top}px`;
+}
+
+function moveHeldItemFollower(position: { clientX: number; clientY: number }): void {
+    if (!heldItemFollower) {
+        return;
+    }
+
+    const cursorOffset = 10;
+    heldItemFollower.style.left = `${position.clientX + cursorOffset}px`;
+    heldItemFollower.style.top = `${position.clientY + cursorOffset}px`;
 }
 
 function removeActiveTooltip(): void {
@@ -385,6 +402,14 @@ elements.quantityForm.addEventListener("submit", (event) => {
 });
 
 elements.resetButton.addEventListener("click", resetInventory);
+
+document.addEventListener("mousemove", (event) => {
+    lastPointerPosition = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+    };
+    moveHeldItemFollower(lastPointerPosition);
+});
 
 renderInventory(inventory);
 renderHeldSlot(heldSlot);
