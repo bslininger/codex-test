@@ -265,6 +265,7 @@ h1 {
 }
 
 .item-button,
+.purchase-button,
 .secondary-button {
     min-height: 42px;
     border: 1px solid transparent;
@@ -281,6 +282,16 @@ h1 {
 
 .item-button:hover {
     background: #185d75;
+}
+
+.purchase-button {
+    padding: 0 16px;
+    color: #ffffff;
+    background: #0f766e;
+}
+
+.purchase-button:hover {
+    background: #115e59;
 }
 
 .secondary-button {
@@ -366,6 +377,7 @@ h1 {
     }
 
     .item-button,
+    .purchase-button,
     .secondary-button {
         width: 100%;
     }

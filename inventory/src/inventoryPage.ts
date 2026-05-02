@@ -2,6 +2,7 @@ import "./styles.css";
 
 import {
     addItem,
+    buyItem,
     createMoney,
     createHeldSlot,
     createInventory,
@@ -9,6 +10,7 @@ import {
     pullQuantityFromInventorySlotToHeldSlot,
     sellHeldItem,
     type AddItemResult,
+    type BuyItemResult,
     type HeldSlot,
     type HeldSlotInteractionResult,
     type Inventory,
@@ -42,6 +44,7 @@ const elements = {
     quantityInput: getElement<HTMLInputElement>("#quantity-input"),
     quantityCancelButton: getElement<HTMLButtonElement>("#quantity-cancel-button"),
     itemButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-item-id]")),
+    purchaseButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-buy-item-id]")),
 };
 
 function getElement<T extends HTMLElement>(selector: string): T {
@@ -163,6 +166,34 @@ function renderSellHeldItemResult(result: SellHeldItemResult): void {
     elements.resultOutput.value = [
         `Sold: ${result.quantity} ${itemDefinition?.name ?? result.itemId}`,
         `Value: ${result.valueCopper} copper`,
+    ].join(" | ");
+}
+
+function renderBuyItemResult(result: BuyItemResult): void {
+    const itemDefinition = ITEM_DEFINITIONS[result.itemId];
+    const itemName = itemDefinition?.name ?? result.itemId;
+
+    if (result.kind === "bought") {
+        elements.resultOutput.value = [
+            `Bought: ${result.quantity} ${itemName}`,
+            `Cost: ${result.totalPriceCopper} copper`,
+            `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
+        ].join(" | ");
+        return;
+    }
+
+    if (result.kind === "not-enough-money") {
+        elements.resultOutput.value = [
+            `Could not buy ${result.quantity} ${itemName}`,
+            `Need: ${result.totalPriceCopper} copper`,
+            `Have: ${result.availableCopper} copper`,
+        ].join(" | ");
+        return;
+    }
+
+    elements.resultOutput.value = [
+        `Could not buy ${result.quantity} ${itemName}`,
+        `Inventory space: ${result.availableCapacity}`,
     ].join(" | ");
 }
 
@@ -361,6 +392,25 @@ elements.itemButtons.forEach((button) => {
         renderInventory(inventory);
         renderHeldSlot(heldSlot);
         renderResult(result);
+    });
+});
+
+elements.purchaseButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        const itemId = button.dataset.buyItemId;
+        const quantity = Number(button.dataset.buyQuantity);
+
+        if (!itemId) {
+            throw new Error("Purchase button is missing an item id.");
+        }
+
+        const result = buyItem(inventory, ITEM_DEFINITIONS, playerMoney, itemId, quantity);
+
+        lastChangedSlotIndices = result.kind === "bought" ? result.changedSlotIndices : [];
+        renderInventory(inventory);
+        renderHeldSlot(heldSlot);
+        renderMoney(playerMoney);
+        renderBuyItemResult(result);
     });
 });
 
