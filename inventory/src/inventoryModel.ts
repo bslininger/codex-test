@@ -91,6 +91,40 @@ export type SellHeldItemResult = {
     moneyAdded: Money;
 };
 
+export type SpendMoneyResult =
+    | {
+          kind: "spent";
+          costCopper: number;
+      }
+    | {
+          kind: "not-enough-money";
+          costCopper: number;
+          availableCopper: number;
+      };
+
+export type BuyItemResult =
+    | {
+          kind: "bought";
+          itemId: string;
+          quantity: number;
+          totalPriceCopper: number;
+          changedSlotIndices: number[];
+      }
+    | {
+          kind: "not-enough-money";
+          itemId: string;
+          quantity: number;
+          totalPriceCopper: number;
+          availableCopper: number;
+      }
+    | {
+          kind: "not-enough-space";
+          itemId: string;
+          quantity: number;
+          availableCapacity: number;
+      };
+
+
 export function createInventory(slotCount: number): Inventory {
     return {
         slots: Array.from({ length: slotCount }, () => null),
@@ -405,6 +439,11 @@ export function convertCopperToLowestTerms(valueCopper: number): Money {
     };
 }
 
+function convertMoneyToCopper(money: Money): number {
+    validateMoney(money);
+    return money.gold * 10000 + money.silver * 100 + money.copper;
+}
+
 export function addMoney(money: Money, moneyToAdd: Money): void {
     validateMoney(moneyToAdd);
 
@@ -445,6 +484,106 @@ export function sellHeldItem(
     };
 }
 
+export function spendMoney(
+    money: Money,
+    costCopper: number,
+): SpendMoneyResult {
+    validateMoney(money);
+    validateMoneyAmount(costCopper, "costCopper");
+
+    const moneyInCopper = convertMoneyToCopper(money);
+    if (moneyInCopper < costCopper) {
+        return {
+            kind: "not-enough-money",
+            costCopper: costCopper,
+            availableCopper: moneyInCopper
+        };
+    }
+
+    let copper = money.copper;
+    let silver = money.silver;
+    let gold = money.gold;
+
+    while (costCopper > copper) {
+        if (silver === 0) {
+            gold -= 1;
+            silver += 100;
+        }
+        silver -= 1;
+        copper += 100;
+    }
+
+    copper -= costCopper;
+    money.gold = gold;
+    money.silver = silver;
+    money.copper = copper;
+    validateMoney(money);
+    return {
+        kind: "spent",
+        costCopper: costCopper
+    };
+}
+
+export function buyItem(
+    inventory: Inventory,
+    itemDefinitions: Record<string, ItemDefinition>,
+    money: Money,
+    itemId: string,
+    quantity: number,
+): BuyItemResult {
+    const itemDefinition = itemDefinitions[itemId];
+    if (!itemDefinition) {
+        throw new Error(`Unknown item id: ${itemId}`);
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error("Quantity must be a positive integer.");
+    }
+
+    validateMoney(money);
+    const totalPriceCopper = itemDefinition.valueCopper * quantity;
+    validateMoneyAmount(totalPriceCopper, "totalPriceCopper");
+    let availableCopper = convertMoneyToCopper(money);
+    if (availableCopper < totalPriceCopper) {
+        return {
+            kind: "not-enough-money",
+            itemId,
+            quantity,
+            totalPriceCopper,
+            availableCopper
+        };
+    }
+
+    const availableCapacity = getAddItemCapacity(inventory, itemDefinitions, itemId)
+    if (quantity > availableCapacity) {
+        return {
+            kind: "not-enough-space",
+            itemId,
+            quantity,
+            availableCapacity
+        };
+    }
+
+    const spendMoneyResult = spendMoney(money, totalPriceCopper);
+    if (spendMoneyResult.kind === "not-enough-money") {
+        throw new Error("Money was cleared to be spent despite not having enough.");
+    }
+
+    const addItemResult = addItem(inventory, itemDefinitions, itemId, quantity);
+    if (addItemResult.leftoverQuantity !== 0) {
+        throw new Error("Items were cleared to be purchased despite not having enough inventory space for all of them.");
+    }
+
+    return {
+        kind: "bought",
+        itemId,
+        quantity,
+        totalPriceCopper,
+        changedSlotIndices: addItemResult.changedSlotIndices
+    }
+}
+
+
 function buildAddItemResult(
     requestedQuantity: number,
     remainingQuantity: number,
@@ -455,6 +594,30 @@ function buildAddItemResult(
         leftoverQuantity: remainingQuantity,
         changedSlotIndices: Array.from(changedSlotIndices),
     };
+}
+
+export function getAddItemCapacity(
+    inventory: Inventory,
+    itemDefinitions: Record<string, ItemDefinition>,
+    itemId: string,
+): number {
+    const itemDefinition = itemDefinitions[itemId];
+    if (!itemDefinition) {
+        throw new Error(`Unknown item id: ${itemId}`);
+    }
+
+    let availableCapacity = 0;
+
+    for (let index = 0; index < inventory.slots.length; index += 1) {
+        const slot = inventory.slots[index];
+        if (!slot) {
+            availableCapacity += itemDefinition.maxStackSize;
+        } else if (slot.itemId === itemId) {
+            availableCapacity += (itemDefinition.maxStackSize - slot.quantity);
+        }
+    }
+
+    return availableCapacity;
 }
 
 function validateSlotIndex(inventory: Inventory, index: number): void {

@@ -7,10 +7,13 @@ import {
     moveSlot,
     pullQuantityFromInventorySlotToHeldSlot,
     sellHeldItem,
+    spendMoney,
+    getAddItemCapacity,
+    buyItem,
 } from "./inventoryModel.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
 
-const inventory = createInventory(3);
+let inventory = createInventory(3);
 
 addItem(inventory, ITEM_DEFINITIONS, "health-potion", 6);
 addItem(inventory, ITEM_DEFINITIONS, "apple", 3);
@@ -52,10 +55,88 @@ console.log(heldSlot);
 console.log("Inventory after pull:");
 console.log(inventory.slots);
 
-const money = createMoney();
+let money = createMoney();
 const sellResult = sellHeldItem(heldSlot, ITEM_DEFINITIONS, money);
 
 console.log("Sell result:");
 console.log(sellResult);
 console.log("Money after sale:");
+console.log(money);
+
+money = createMoney(1, 5, 50);
+let spendMoneyResult = spendMoney(money, 290);
+
+console.log("Spend money result 1:");
+console.log(spendMoneyResult);
+console.log("Money after spending:");
+console.log(money);
+
+spendMoneyResult = spendMoney(money, 315);
+
+console.log("Spend money result 2:");
+console.log(spendMoneyResult);
+console.log("Money after spending:");
+console.log(money);
+
+money = createMoney(0, 0, 500);
+spendMoneyResult = spendMoney(money, 195);
+
+console.log("Spend money result 3:");
+console.log(spendMoneyResult);
+console.log("Money after spending:");
+console.log(money);
+
+spendMoneyResult = spendMoney(money, 20000);
+
+console.log("Spend money result 4:");
+console.log(spendMoneyResult);
+console.log("Money after spending:");
+console.log(money);
+
+inventory = createInventory(3);
+addItem(inventory, ITEM_DEFINITIONS, "health-potion", 6);
+addItem(inventory, ITEM_DEFINITIONS, "apple", 3);
+const itemsToAdd = ["health-potion", "apple", "sword"];
+const capacitiesToAdd = itemsToAdd.map((itemId) => getAddItemCapacity(inventory, ITEM_DEFINITIONS, itemId));
+
+console.log("Inventory:");
+console.log(inventory.slots);
+console.log("Remaining item capacities:");
+console.log(itemsToAdd.map((itemId, index) => `${itemId}: ${capacitiesToAdd[index]}`).join("; "));
+
+money = createMoney(0, 40, 0);
+let moneyBeforePurchase = { ...money };
+let buyItemResult = buyItem(inventory, ITEM_DEFINITIONS, money, "sword", 1);
+
+console.log("Buy item result 1:");
+console.log(buyItemResult);
+console.log("Money before purchase:");
+console.log(moneyBeforePurchase);
+console.log("Inventory after purchase:");
+console.log(inventory);
+console.log("Money after purchase");
+console.log(money);
+
+moneyBeforePurchase = { ...money };
+buyItemResult = buyItem(inventory, ITEM_DEFINITIONS, money, "health-potion", 15);
+
+console.log("Buy item result 2:");
+console.log(buyItemResult);
+console.log("Money before purchase:");
+console.log(moneyBeforePurchase);
+console.log("Inventory after purchase:");
+console.log(inventory);
+console.log("Money after purchase");
+console.log(money);
+
+moneyBeforePurchase = { ...money };
+buyItemResult = buyItem(inventory, ITEM_DEFINITIONS, money, "apple", 37);
+
+console.log("Buy item result 3:");
+console.log(buyItemResult);
+console.log("Money before purchase:");
+console.log(moneyBeforePurchase);
+console.log("Inventory after purchase:");
+console.log(inventory);
+console.log("Money after purchase");
 console.log(money);
