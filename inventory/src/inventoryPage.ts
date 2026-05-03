@@ -9,18 +9,20 @@ import {
     interactHeldSlotWithInventorySlot,
     pullQuantityFromInventorySlotToHeldSlot,
     sellHeldItem,
-    type AddItemResult,
-    type BuyItemResult,
-    type HeldSlot,
-    type HeldSlotInteractionResult,
     type Inventory,
-    type Money,
-    type PullQuantityResult,
-    type SellHeldItemResult,
 } from "./inventoryModel.js";
-import { createItemTooltip } from "./itemTooltip.js";
 import { ITEM_DEFINITIONS } from "./itemDefinitions.js";
-import { createItemSprite, createMoneyAmountDisplayElements } from "./viewHelpers.js";
+import {
+    moveHeldItemFollowerToPointer,
+    renderAddItemResult,
+    renderBuyItemResult,
+    renderHeldSlot,
+    renderHeldSlotInteractionResult,
+    renderInventory,
+    renderMoney,
+    renderPullQuantityResult,
+    renderSellHeldItemResult,
+} from "./inventoryView.js";
 
 const slotCount = 8;
 const inventory = createInventory(slotCount);
@@ -28,9 +30,6 @@ const heldSlot = createHeldSlot();
 const playerMoney = createMoney();
 let lastChangedSlotIndices: number[] = [];
 let quantityDialogSourceIndex: number | null = null;
-let activeTooltip: HTMLElement | null = null;
-let heldItemFollower: HTMLElement | null = null;
-let lastPointerPosition: { clientX: number; clientY: number } | null = null;
 
 const elements = {
     moneyDisplay: getElement<HTMLDivElement>("#money-display"),
@@ -57,249 +56,6 @@ function getElement<T extends HTMLElement>(selector: string): T {
     return element;
 }
 
-function renderInventory(inventoryToRender: Inventory): void {
-    removeActiveTooltip();
-
-    elements.slotGrid.replaceChildren(
-        ...inventoryToRender.slots.map((slot, index) => {
-            const slotElement = document.createElement("div");
-            slotElement.className = "slot";
-
-            if (lastChangedSlotIndices.includes(index)) {
-                slotElement.classList.add("is-changed");
-            }
-
-            slotElement.tabIndex = 0;
-            slotElement.setAttribute("role", "button");
-            slotElement.setAttribute("aria-label", `Slot ${index + 1}`);
-
-            if (!slot) {
-                slotElement.classList.add("is-empty");
-            } else {
-                const itemDefinition = ITEM_DEFINITIONS[slot.itemId];
-                const imageElement = createItemSprite(slot.itemId);
-                slotElement.setAttribute(
-                    "aria-label",
-                    `Slot ${index + 1}: ${itemDefinition?.name ?? slot.itemId}, quantity ${slot.quantity}`,
-                );
-
-                slotElement.append(imageElement);
-
-                if (slot.quantity > 1) {
-                    const quantityElement = document.createElement("div");
-                    quantityElement.className = "slot-quantity";
-                    quantityElement.textContent = String(slot.quantity);
-                    slotElement.append(quantityElement);
-                }
-
-                slotElement.addEventListener("mouseenter", (event) => {
-                    showItemTooltip(itemDefinition, slot.quantity, event);
-                });
-                slotElement.addEventListener("mousemove", moveActiveTooltip);
-                slotElement.addEventListener("mouseleave", removeActiveTooltip);
-            }
-
-            slotElement.addEventListener("click", (event) => handleSlotClick(event, index));
-            slotElement.addEventListener("keydown", (event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    handleSlotClick(event, index);
-                }
-            });
-
-            return slotElement;
-        }),
-    );
-}
-
-function renderHeldSlot(heldSlotToRender: HeldSlot): void {
-    renderHeldItemFollower(heldSlotToRender);
-}
-
-function renderHeldItemFollower(heldSlotToRender: HeldSlot): void {
-    heldItemFollower?.remove();
-    heldItemFollower = null;
-
-    if (!heldSlotToRender.entry) {
-        return;
-    }
-
-    heldItemFollower = createHeldItemFollowerElement(heldSlotToRender.entry);
-    document.body.append(heldItemFollower);
-
-    if (lastPointerPosition) {
-        moveHeldItemFollower(lastPointerPosition);
-    }
-}
-
-function createHeldItemFollowerElement(entry: NonNullable<HeldSlot["entry"]>): HTMLElement {
-    const followerElement = document.createElement("div");
-    followerElement.className = "held-item-follower";
-    followerElement.setAttribute("aria-hidden", "true");
-    followerElement.append(createItemSprite(entry.itemId));
-
-    if (entry.quantity > 1) {
-        const quantityElement = document.createElement("div");
-        quantityElement.className = "slot-quantity";
-        quantityElement.textContent = String(entry.quantity);
-        followerElement.append(quantityElement);
-    }
-
-    return followerElement;
-}
-
-function renderMoney(money: Money): void {
-    elements.moneyDisplay.replaceChildren(...createMoneyAmountDisplayElements(money));
-}
-
-function renderResult(result: AddItemResult): void {
-    elements.resultOutput.value = [
-        `Added: ${result.addedQuantity}`,
-        `Left over: ${result.leftoverQuantity}`,
-        `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
-    ].join(" | ");
-}
-
-function renderSellHeldItemResult(result: SellHeldItemResult): void {
-    const itemDefinition = ITEM_DEFINITIONS[result.itemId];
-
-    elements.resultOutput.value = [
-        `Sold: ${result.quantity} ${itemDefinition?.name ?? result.itemId}`,
-        `Value: ${result.valueCopper} copper`,
-    ].join(" | ");
-}
-
-function renderBuyItemResult(result: BuyItemResult): void {
-    const itemDefinition = ITEM_DEFINITIONS[result.itemId];
-    const itemName = itemDefinition?.name ?? result.itemId;
-
-    if (result.kind === "bought") {
-        elements.resultOutput.value = [
-            `Bought: ${result.quantity} ${itemName}`,
-            `Cost: ${result.totalPriceCopper} copper`,
-            `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
-        ].join(" | ");
-        return;
-    }
-
-    if (result.kind === "not-enough-money") {
-        elements.resultOutput.value = [
-            `Could not buy ${result.quantity} ${itemName}`,
-            `Need: ${result.totalPriceCopper} copper`,
-            `Have: ${result.availableCopper} copper`,
-        ].join(" | ");
-        return;
-    }
-
-    elements.resultOutput.value = [
-        `Could not buy ${result.quantity} ${itemName}`,
-        `Inventory space: ${result.availableCapacity}`,
-    ].join(" | ");
-}
-
-function renderPullQuantityResult(result: PullQuantityResult): void {
-    elements.resultOutput.value = [
-        `Pulled: ${result.quantity}`,
-        result.fullStack ? "Full stack" : "Partial stack",
-        `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
-    ].join(" | ");
-}
-
-function renderHeldSlotInteractionResult(result: HeldSlotInteractionResult): void {
-    if (result.kind === "no-op") {
-        elements.resultOutput.value = `Held slot: ${formatHeldSlotNoOpReason(result.reason)}`;
-        return;
-    }
-
-    if (result.kind === "merged") {
-        elements.resultOutput.value = [
-            `Move: merged ${result.movedQuantity}`,
-            `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
-        ].join(" | ");
-        return;
-    }
-
-    elements.resultOutput.value = [
-        `Held slot: ${formatInteractionKind(result.kind)}`,
-        `Changed slots: ${formatChangedSlots(result.changedSlotIndices)}`,
-    ].join(" | ");
-}
-
-function formatChangedSlots(changedSlotIndices: number[]): string {
-    if (changedSlotIndices.length === 0) {
-        return "none";
-    }
-
-    return changedSlotIndices.map((index) => String(index + 1)).join(", ");
-}
-
-function formatHeldSlotNoOpReason(
-    reason: Extract<HeldSlotInteractionResult, { kind: "no-op" }>["reason"],
-): string {
-    if (reason === "empty-held-and-empty-target") {
-        return "nothing to pick up or place";
-    }
-
-    return "target stack is full";
-}
-
-function formatInteractionKind(kind: Exclude<HeldSlotInteractionResult["kind"], "merged" | "no-op">): string {
-    if (kind === "picked-up") {
-        return "picked up";
-    }
-
-    return kind;
-}
-
-function showItemTooltip(item: (typeof ITEM_DEFINITIONS)[string], quantity: number, event: MouseEvent): void {
-    removeActiveTooltip();
-    activeTooltip = createItemTooltip(item, quantity);
-    document.body.append(activeTooltip);
-    moveActiveTooltip(event);
-}
-
-function moveActiveTooltip(event: MouseEvent): void {
-    if (!activeTooltip) {
-        return;
-    }
-
-    const cursorOffset = 10;
-    const pageMargin = 8;
-    const tooltipRect = activeTooltip.getBoundingClientRect();
-    let left = event.clientX - tooltipRect.width - cursorOffset;
-    let top = event.clientY - tooltipRect.height - cursorOffset;
-
-    if (left < pageMargin) {
-        left = event.clientX + cursorOffset;
-    }
-
-    if (top < pageMargin) {
-        top = pageMargin;
-    }
-
-    if (left + tooltipRect.width > window.innerWidth - pageMargin) {
-        left = window.innerWidth - tooltipRect.width - pageMargin;
-    }
-
-    activeTooltip.style.left = `${left}px`;
-    activeTooltip.style.top = `${top}px`;
-}
-
-function moveHeldItemFollower(position: { clientX: number; clientY: number }): void {
-    if (!heldItemFollower) {
-        return;
-    }
-
-    const cursorOffset = 10;
-    heldItemFollower.style.left = `${position.clientX + cursorOffset}px`;
-    heldItemFollower.style.top = `${position.clientY + cursorOffset}px`;
-}
-
-function removeActiveTooltip(): void {
-    activeTooltip?.remove();
-    activeTooltip = null;
-}
-
 function handleSlotClick(event: MouseEvent | KeyboardEvent, index: number): void {
     const slot = inventory.slots[index];
 
@@ -316,18 +72,18 @@ function handleSlotClick(event: MouseEvent | KeyboardEvent, index: number): void
     const result = interactHeldSlotWithInventorySlot(heldSlot, inventory, ITEM_DEFINITIONS, index);
 
     lastChangedSlotIndices = result.changedSlotIndices;
-    renderInventory(inventory);
+    renderInventoryPage();
     renderHeldSlot(heldSlot);
-    renderHeldSlotInteractionResult(result);
+    renderHeldSlotInteractionResult(elements.resultOutput, result);
 }
 
 function pullQuantity(sourceIndex: number, quantity: number): void {
     const result = pullQuantityFromInventorySlotToHeldSlot(heldSlot, inventory, sourceIndex, quantity);
 
     lastChangedSlotIndices = result.changedSlotIndices;
-    renderInventory(inventory);
+    renderInventoryPage();
     renderHeldSlot(heldSlot);
-    renderPullQuantityResult(result);
+    renderPullQuantityResult(elements.resultOutput, result);
 }
 
 function openQuantityDialog(sourceIndex: number): void {
@@ -372,9 +128,19 @@ function resetInventory(): void {
     lastChangedSlotIndices = [];
     closeQuantityDialog();
     elements.resultOutput.value = "";
-    renderInventory(inventory);
+    renderInventoryPage();
     renderHeldSlot(heldSlot);
-    renderMoney(playerMoney);
+    renderMoney(elements.moneyDisplay, playerMoney);
+}
+
+function renderInventoryPage(): void {
+    renderInventory({
+        slotGridElement: elements.slotGrid,
+        inventory,
+        itemDefinitions: ITEM_DEFINITIONS,
+        lastChangedSlotIndices,
+        onSlotClick: handleSlotClick,
+    });
 }
 
 elements.itemButtons.forEach((button) => {
@@ -389,9 +155,9 @@ elements.itemButtons.forEach((button) => {
         const result = addItem(inventory, ITEM_DEFINITIONS, itemId, quantity);
 
         lastChangedSlotIndices = result.changedSlotIndices;
-        renderInventory(inventory);
+        renderInventoryPage();
         renderHeldSlot(heldSlot);
-        renderResult(result);
+        renderAddItemResult(elements.resultOutput, result);
     });
 });
 
@@ -407,10 +173,10 @@ elements.purchaseButtons.forEach((button) => {
         const result = buyItem(inventory, ITEM_DEFINITIONS, playerMoney, itemId, quantity);
 
         lastChangedSlotIndices = result.kind === "bought" ? result.changedSlotIndices : [];
-        renderInventory(inventory);
+        renderInventoryPage();
         renderHeldSlot(heldSlot);
-        renderMoney(playerMoney);
-        renderBuyItemResult(result);
+        renderMoney(elements.moneyDisplay, playerMoney);
+        renderBuyItemResult(elements.resultOutput, ITEM_DEFINITIONS, result);
     });
 });
 
@@ -423,8 +189,8 @@ elements.sellHeldButton.addEventListener("click", () => {
     const result = sellHeldItem(heldSlot, ITEM_DEFINITIONS, playerMoney);
 
     renderHeldSlot(heldSlot);
-    renderMoney(playerMoney);
-    renderSellHeldItemResult(result);
+    renderMoney(elements.moneyDisplay, playerMoney);
+    renderSellHeldItemResult(elements.resultOutput, ITEM_DEFINITIONS, result);
 });
 
 elements.quantitySlider.addEventListener("input", () => {
@@ -454,13 +220,9 @@ elements.quantityForm.addEventListener("submit", (event) => {
 elements.resetButton.addEventListener("click", resetInventory);
 
 document.addEventListener("mousemove", (event) => {
-    lastPointerPosition = {
-        clientX: event.clientX,
-        clientY: event.clientY,
-    };
-    moveHeldItemFollower(lastPointerPosition);
+    moveHeldItemFollowerToPointer(event);
 });
 
-renderInventory(inventory);
+renderInventoryPage();
 renderHeldSlot(heldSlot);
-renderMoney(playerMoney);
+renderMoney(elements.moneyDisplay, playerMoney);
