@@ -29,7 +29,12 @@ const inventory = createInventory(slotCount);
 const heldSlot = createHeldSlot();
 const playerMoney = createMoney();
 let lastChangedSlotIndices: number[] = [];
-let quantityDialogSourceIndex: number | null = null;
+let quantityDialogMode: QuantityDialogMode | null = null;
+
+type QuantityDialogMode = {
+    kind: "pull-from-slot";
+    sourceIndex: number;
+};
 
 const elements = {
     moneyDisplay: getElement<HTMLDivElement>("#money-display"),
@@ -65,14 +70,17 @@ function handleSlotClick(event: MouseEvent | KeyboardEvent, index: number): void
     }
 
     if (!heldSlot.entry && slot && slot.quantity > 1 && event.shiftKey) {
-        openQuantityDialog(index);
+        openQuantityDialog({
+            kind: "pull-from-slot",
+            sourceIndex: index,
+        }, slot.quantity);
         return;
     }
 
     const result = interactHeldSlotWithInventorySlot(heldSlot, inventory, ITEM_DEFINITIONS, index);
 
     lastChangedSlotIndices = result.changedSlotIndices;
-    renderInventoryPage();
+    refreshInventoryView();
     renderHeldSlot(heldSlot);
     renderHeldSlotInteractionResult(elements.resultOutput, result);
 }
@@ -81,22 +89,20 @@ function pullQuantity(sourceIndex: number, quantity: number): void {
     const result = pullQuantityFromInventorySlotToHeldSlot(heldSlot, inventory, sourceIndex, quantity);
 
     lastChangedSlotIndices = result.changedSlotIndices;
-    renderInventoryPage();
+    refreshInventoryView();
     renderHeldSlot(heldSlot);
     renderPullQuantityResult(elements.resultOutput, result);
 }
 
-function openQuantityDialog(sourceIndex: number): void {
-    const slot = inventory.slots[sourceIndex];
-
-    if (!slot) {
-        throw new Error(`Cannot open quantity dialog for empty slot: ${sourceIndex}`);
+function openQuantityDialog(mode: QuantityDialogMode, maxQuantity: number): void {
+    if (!Number.isInteger(maxQuantity) || maxQuantity < 1) {
+        throw new Error("Quantity dialog max must be a positive integer.");
     }
 
-    quantityDialogSourceIndex = sourceIndex;
+    quantityDialogMode = mode;
 
-    elements.quantitySlider.max = String(slot.quantity);
-    elements.quantityInput.max = String(slot.quantity);
+    elements.quantitySlider.max = String(maxQuantity);
+    elements.quantityInput.max = String(maxQuantity);
     elements.quantitySlider.value = "1";
     elements.quantityInput.value = "1";
     elements.quantityDialog.showModal();
@@ -104,7 +110,7 @@ function openQuantityDialog(sourceIndex: number): void {
 }
 
 function closeQuantityDialog(): void {
-    quantityDialogSourceIndex = null;
+    quantityDialogMode = null;
     elements.quantityDialog.close();
 }
 
@@ -128,12 +134,12 @@ function resetInventory(): void {
     lastChangedSlotIndices = [];
     closeQuantityDialog();
     elements.resultOutput.value = "";
-    renderInventoryPage();
+    refreshInventoryView();
     renderHeldSlot(heldSlot);
     renderMoney(elements.moneyDisplay, playerMoney);
 }
 
-function renderInventoryPage(): void {
+function refreshInventoryView(): void {
     renderInventory({
         slotGridElement: elements.slotGrid,
         inventory,
@@ -155,7 +161,7 @@ elements.itemButtons.forEach((button) => {
         const result = addItem(inventory, ITEM_DEFINITIONS, itemId, quantity);
 
         lastChangedSlotIndices = result.changedSlotIndices;
-        renderInventoryPage();
+        refreshInventoryView();
         renderHeldSlot(heldSlot);
         renderAddItemResult(elements.resultOutput, result);
     });
@@ -173,7 +179,7 @@ elements.purchaseButtons.forEach((button) => {
         const result = buyItem(inventory, ITEM_DEFINITIONS, playerMoney, itemId, quantity);
 
         lastChangedSlotIndices = result.kind === "bought" ? result.changedSlotIndices : [];
-        renderInventoryPage();
+        refreshInventoryView();
         renderHeldSlot(heldSlot);
         renderMoney(elements.moneyDisplay, playerMoney);
         renderBuyItemResult(elements.resultOutput, ITEM_DEFINITIONS, result);
@@ -206,15 +212,19 @@ elements.quantityCancelButton.addEventListener("click", closeQuantityDialog);
 elements.quantityForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
-    if (quantityDialogSourceIndex === null) {
-        throw new Error("Quantity dialog submitted without a source slot.");
+    if (quantityDialogMode === null) {
+        throw new Error("Quantity dialog submitted without a mode.");
     }
 
     const quantity = Number(elements.quantityInput.value);
-    const sourceIndex = quantityDialogSourceIndex;
+    const mode = quantityDialogMode;
 
     closeQuantityDialog();
-    pullQuantity(sourceIndex, quantity);
+
+    if (mode.kind === "pull-from-slot") {
+        pullQuantity(mode.sourceIndex, quantity);
+        return;
+    }
 });
 
 elements.resetButton.addEventListener("click", resetInventory);
@@ -223,6 +233,6 @@ document.addEventListener("mousemove", (event) => {
     moveHeldItemFollowerToPointer(event);
 });
 
-renderInventoryPage();
+refreshInventoryView();
 renderHeldSlot(heldSlot);
 renderMoney(elements.moneyDisplay, playerMoney);

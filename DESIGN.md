@@ -228,3 +228,93 @@ Useful next directions:
 - Consider whether `inventoryPage.ts` is starting to mix too much view and controller logic.
 - Add purchase/spend-money behavior later, where copper is spent before silver/gold according to the chosen non-normalized money design.
 - Add equipment slots, container inventories, or item instance state such as durability/charges when the current model starts needing them.
+
+## Latest Continuity Update
+
+This section supersedes any stale "Current Project State" notes above.
+
+Recent model work:
+
+- `inventory/src/inventoryModel.ts` now includes reusable money spending behavior through `spendMoney`.
+- Player money is still stored as non-normalized `{ gold, silver, copper }`.
+- Spending uses the lowest denomination first: copper before silver before gold.
+- Larger denominations are broken only when needed, and change is returned in lower denominations.
+- `getAddItemCapacity` checks how many of an item can fit without mutating inventory.
+- `buyItem` is a transactional model operation for purchases:
+  - it throws for invalid item ids or invalid quantities,
+  - returns `not-enough-money` for expected affordability failure,
+  - returns `not-enough-space` for expected inventory capacity failure,
+  - mutates money and inventory only after pre-checks pass,
+  - throws if post-check invariants fail.
+- `inventory/src/inventoryNodeDemo.ts` has been expanded as a lightweight model exercise/demo for spending, capacity, and buying.
+
+Recent view/controller work:
+
+- The old top "held item" panel was removed.
+- The held item now appears as a cursor follower, 10px down and right from the cursor.
+- The held item follower is allowed to go off the right or bottom of the viewport.
+- The held item follower has higher z-index than the tooltip, so if they overlap the held item appears above.
+- Temporary purchase buttons were added to the page:
+  - `Buy 3 Apples`
+  - `Buy 2 Potions`
+- These are intentionally temporary test controls, not the final merchant UI.
+- `inventory/src/inventoryView.ts` was added and now owns rendering/DOM display responsibilities.
+- `inventory/src/inventoryPage.ts` is now mostly page/controller wiring:
+  - app state,
+  - DOM element lookup,
+  - user event handlers,
+  - model calls,
+  - deciding when to refresh the view.
+- The view module does not import `ITEM_DEFINITIONS`; the page/controller passes item definitions in.
+- Missing item definitions in the view should fall back gracefully to the raw `itemId` and log `console.warn`.
+- Missing sprites are still handled by `createItemSprite`, which falls back to `placeholder.png`.
+- `renderInventoryPage` was renamed to `refreshInventoryView` to clarify that the page/controller asks the view to refresh, while the view owns actual rendering.
+- The quantity dialog controller state was refactored from a bare `quantityDialogSourceIndex` into a `QuantityDialogMode`.
+- Currently the only quantity dialog mode is:
+  - `{ kind: "pull-from-slot"; sourceIndex: number }`
+- This was done so the same quantity dialog can later support buying from merchant offers.
+
+Current design understanding:
+
+- Model code owns domain rules and state transitions.
+- View code owns DOM creation, display text, CSS classes, tooltip/cursor follower positioning, and visual fallbacks.
+- Controller/page code is the middleman:
+  - it interprets user actions,
+  - chooses model operations,
+  - updates transient app/controller state,
+  - tells the view what state/result to render.
+- Some code can be view-ish but remain in the controller temporarily if it is tightly tied to a workflow, such as the quantity chooser input syncing.
+
+Next planned feature:
+
+- Add a merchant screen/panel.
+- When a merchant screen is open, both the player's inventory and the merchant's merchandise should be visible.
+- Merchant merchandise should behave like a shop catalog, not like a finite slot inventory.
+- Merchants have infinite inventory of the items they sell.
+- A merchant offer should probably store `itemId` only for now; purchase quantity is chosen during interaction.
+- If an offered item's `maxStackSize` is `1`, clicking buys one.
+- If `maxStackSize` is greater than `1`, clicking opens the existing quantity chooser.
+- The quantity chooser should have min `1` and max equal to the player's current capacity for that item from `getAddItemCapacity`.
+- If capacity is `0`, the controller should not open the chooser and should instead show an inventory-full style result.
+- The next model/domain file should probably be `inventory/src/merchantModel.ts`.
+- Proposed initial merchant model:
+  - `MerchantOffer` with `itemId`.
+  - `Merchant` with `id`, `name`, and `offers`.
+- A later merchant model operation may be `buyMerchantOffer`, which validates that the merchant actually sells the item before delegating to `buyItem`.
+- Trying to buy an item a merchant does not sell should be treated as an invalid operation/programmer error, not a normal gameplay result.
+
+Current collaboration preferences:
+
+- Brian wants to write model code himself when practical and have Codex review it.
+- Brian also wants to write meaningful controller workflow code when it is design-rich.
+- Codex can more freely implement view/CSS/DOM changes, but should still explain the boundary decisions.
+- Use hints when Brian asks for hints; do not jump straight to final answers in those moments.
+- Ask one design question at a time.
+- Prefer leading questions that help Brian figure out the design, especially for model and controller code.
+- Be explicit about whether a change is model, view, controller, or app composition/root wiring.
+- Treat naming and small clarifying comments as part of understandability, not as cosmetic trivia.
+- Brian has his own coding style and may intentionally keep formatting choices that differ from common formatter defaults.
+- When reviewing Brian's code, separate correctness/design concerns from optional style polish.
+- Avoid automatically rewriting Brian's code into a different style unless the change is necessary or requested.
+- Brian is using this project partly to preserve and strengthen human understanding in an AI-heavy coding world.
+- The preferred use of Codex is not "delegate everything," but "use the agent as tutor, reviewer, collaborator, and accelerator while keeping agency."
